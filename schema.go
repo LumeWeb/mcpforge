@@ -41,6 +41,7 @@ type schemaProp struct {
 	when      Feature
 	unless    Feature
 	desc      string
+	descSet   bool
 	enum      []any
 	transform func(*jsonschema.Schema, FeatureSet)
 }
@@ -67,9 +68,11 @@ func Transform(fn func(*jsonschema.Schema, FeatureSet)) PropOpt {
 // Description sets the property's schema description. Most leaves use
 // StringProperty/BoolProperty which take prose directly; Description adapts a
 // pre-built nested-object property (e.g. a reflected source object) that
-// carries no top-level prose of its own.
+// carries no top-level prose of its own. Assignment semantics hold: an
+// explicit empty string clears a base schema's description rather than
+// falling back to it.
 func Description(d string) PropOpt {
-	return func(p *schemaProp) { p.desc = d }
+	return func(p *schemaProp) { p.desc, p.descSet = d, true }
 }
 
 // Enum sets a fixed enum on the property (used for static leaf enums such as
@@ -162,7 +165,7 @@ func (p *schemaProp) visible(fs FeatureSet) bool {
 
 func (p *schemaProp) materialize(fs FeatureSet) *jsonschema.Schema {
 	s := *p.schema // shallow copy; object properties are distinct pointers below
-	if p.desc != "" {
+	if p.descSet {
 		s.Description = p.desc
 	}
 	if p.enum != nil {
