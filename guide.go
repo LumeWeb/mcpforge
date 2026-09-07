@@ -202,6 +202,9 @@ func (b *GuideDecisionBuilder[C]) resolve(ctx C, sub func(string) string) *Guide
 			out = append(out, rb)
 		}
 	}
+	if len(out) == 0 {
+		return nil
+	}
 	return &GuideDecision{Question: b.question, Branches: out}
 }
 

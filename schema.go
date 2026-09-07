@@ -31,12 +31,17 @@ type SchemaBuilder struct {
 }
 
 // schemaProp is one contributed property. Feature gates and shape transforms
-// are applied at Build time against the resolved feature set.
+// are applied at Build time against the resolved feature set. Option values
+// are held on the contribution rather than written into the shared schema so
+// a caller's pre-built schema object (e.g. one reused across builders) is
+// never mutated.
 type schemaProp struct {
 	name      string
 	schema    *jsonschema.Schema
 	when      Feature
 	unless    Feature
+	desc      string
+	enum      []any
 	transform func(*jsonschema.Schema, FeatureSet)
 }
 
@@ -64,13 +69,13 @@ func Transform(fn func(*jsonschema.Schema, FeatureSet)) PropOpt {
 // pre-built nested-object property (e.g. a reflected source object) that
 // carries no top-level prose of its own.
 func Description(d string) PropOpt {
-	return func(p *schemaProp) { p.schema.Description = d }
+	return func(p *schemaProp) { p.desc = d }
 }
 
 // Enum sets a fixed enum on the property (used for static leaf enums such as
 // a mode selector). For enums that vary by profile, prefer Transform.
 func Enum(values ...any) PropOpt {
-	return func(p *schemaProp) { p.schema.Enum = values }
+	return func(p *schemaProp) { p.enum = values }
 }
 
 // Schema starts a new tool input schema builder.
@@ -157,6 +162,12 @@ func (p *schemaProp) visible(fs FeatureSet) bool {
 
 func (p *schemaProp) materialize(fs FeatureSet) *jsonschema.Schema {
 	s := *p.schema // shallow copy; object properties are distinct pointers below
+	if p.desc != "" {
+		s.Description = p.desc
+	}
+	if p.enum != nil {
+		s.Enum = p.enum
+	}
 	if p.transform != nil {
 		p.transform(&s, fs)
 	}
