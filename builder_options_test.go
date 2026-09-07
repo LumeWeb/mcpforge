@@ -72,3 +72,30 @@ func TestPropertyOptionsDoNotMutateSharedSchema(t *testing.T) {
 	require.Empty(t, prop(again, "src").Description)
 	require.Empty(t, prop(again, "src").Enum)
 }
+
+// Description uses assignment semantics: an explicit empty string clears a
+// base schema's description it would otherwise fall back to, so builder B can
+// strip prose from a shared schema object without touching builder A's build.
+func TestExplicitEmptyDescriptionOverrides(t *testing.T) {
+	shared := &jsonschema.Schema{Type: "object", Description: "base prose"}
+	prop := func(s *jsonschema.Schema, name string) *jsonschema.Schema {
+		v, _ := s.Properties.Get(name)
+		return v
+	}
+
+	keeps := Schema().Property("src", shared)
+	copied := keeps.Build(featureSet())
+	require.Equal(t, "base prose", prop(copied, "src").Description,
+		"a builder that sets no description falls back to the base schema's")
+
+	clears := Schema().Property("src", shared, Description(""))
+	stripped := clears.Build(featureSet())
+	require.Empty(t, prop(stripped, "src").Description,
+		"an explicit Description(\"\") must clear the base description")
+
+	// Both reads are stable on rebuild: the option lives on the
+	// contribution, the caller's object is never touched.
+	require.Equal(t, "base prose", shared.Description)
+	require.Equal(t, "base prose", prop(keeps.Build(featureSet()), "src").Description)
+	require.Empty(t, prop(clears.Build(featureSet()), "src").Description)
+}
